@@ -27,13 +27,17 @@ export default function SignupScreen({ navigation }) {
   const [shake] = useState(new Animated.Value(0));
 
   const handleSignup = async () => {
+    console.log('handleSignup called');
+  
     if (password.length < 6) {
+      console.log('Password length error');
       Alert.alert('Error', 'Password must be at least 6 characters long');
       shakeAnimation();
       return;
     }
   
     if (password !== passwordcheck) {
+      console.log('Password mismatch error');
       Alert.alert('Error', 'Passwords do not match');
       shakeAnimation();
       return;
@@ -42,36 +46,40 @@ export default function SignupScreen({ navigation }) {
     setLoading(true); // Start loading
   
     try {
+      console.log('Creating user with email and password');
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
-
-      console.table(user);
+      console.log('User created');
   
-      // Save username and email in Firestore
-      try {
-        await setDoc(doc(db, "users", user.uid), {
-          username: username,
-          email: email,
-          password: password,
-        });
-        console.log("Document successfully written!");
-      } catch (error) {
-        console.error("Error adding document: ", error);
+      if (userCredential && userCredential.user) {
+        const user = userCredential.user;
+  
+        console.table({user});
+  
+        // Save username and email in Firestore
+        try {
+          console.log('Saving user data to Firestore');
+          await setDoc(doc(db, "users", user.uid), {
+            username: username,
+            email: email,
+            password: password,
+          });
+          console.log("Document successfully written!");
+        } catch (error) {
+          console.error("Error adding document: ", error);
+        }
+  
+        Alert.alert('Success', `Welcome ${username}`);
+  
+        // Clear form fields
+        setEmail('');
+        setPassword('');
+        setUserName('');
+        setPasswordCheck('');
+      } else {
+        console.error("Error creating user: userCredential is null");
       }
-      
-  
-      Alert.alert('Success', `Welcome ${username}`);
-  
-      // Clear form fields
-      setEmail('');
-      setPassword('');
-      setUserName('');
-      setPasswordCheck('');
-  
-      // Navigate to Login screen
-      navigation.navigate('Login');
     } catch (error) {
-      Alert.alert('Error', error.message);
+      console.error("Error creating user: ", error);
     } finally {
       setLoading(false); // Stop loading
     }
