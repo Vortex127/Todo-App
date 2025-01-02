@@ -57,7 +57,7 @@ export default function LoginScreen({ navigation }) {
       }
   
       // Navigate to WelcomeScreen with uid and username
-      navigation.navigate('Welcome', { uid: user.uid, username });
+      navigation.navigate("UserDrawer");
   
       // Alert.alert('Success', `Welcome back ${username}`);
       setInput('');

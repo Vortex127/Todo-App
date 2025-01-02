@@ -1,361 +1,221 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  Image,
-  TouchableOpacity,
-  ScrollView,
   StyleSheet,
+  ActivityIndicator,
+  Image,
   TextInput,
-  Alert,
-} from 'react-native';
-import { Ionicons } from '@expo/vector-icons';
-import * as ImagePicker from 'expo-image-picker';
-import { doc, getDoc, onSnapshot, updateDoc, setDoc } from 'firebase/firestore';
-import { db } from '../firebase';
+  TouchableOpacity,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { getAuth } from "firebase/auth";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  updateDoc,
+  Timestamp,
+} from "firebase/firestore";
 
-const ProfileScreen = ({ userId }) => {
-  const [userData, setUserData] = useState({
-    username: 'User',
-    imageUrl: null,
-    about: '',
-    skills: [], // Ensure this is initialized as an array
-  });
-  const [newSkill, setNewSkill] = useState('');
-  const [isEditingAbout, setIsEditingAbout] = useState(false);
-  const [isEditingSkills, setIsEditingSkills] = useState(false);
+const Profile = ({ navigation }) => {
+     const [userData, setUserData] = useState(null);
+     const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    console.log('User ID:', userId); // Debugging
-  }, [userId]);
-  
-  useEffect(() => {
-    const fetchProfileData = async () => {
-      try {
-        const userDocRef = doc(db, 'users', userId);
-        const userSnapshot = await getDoc(userDocRef);
-    
-        if (userSnapshot.exists()) {
-          console.log('User Data:', userSnapshot.data()); // Debugging
-          setUserData((prev) => ({
-            ...prev,
-            username: userSnapshot.data().username || 'User',
-          }));
-        } else {
-          console.error('User document not found.');
-        }
-    
-        const profileDocRef = doc(db, 'profile', userId);
-        const unsubscribe = onSnapshot(profileDocRef, (snapshot) => {
-          if (snapshot.exists()) {
-            console.log('Profile Data:', snapshot.data()); // Debugging
-            const profileData = snapshot.data();
-            setUserData((prev) => ({
-              ...prev,
-              about: profileData.about || '',
-              skills: profileData.skills || [],
-              imageUrl: profileData.imageUrl || null,
-            }));
-          } else {
-            console.log('Profile document not found. Initializing default data.');
-            setDoc(profileDocRef, { about: '', skills: [], imageUrl: null });
+      useEffect(() => {
+        const fetchUserData = async () => {
+          try {
+            const auth = getAuth();
+            const user = auth.currentUser;
+
+           if (user) {
+             const db = getFirestore();
+             const userDocRef = doc(db, "users", user.uid);
+            const userDoc = await getDoc(userDocRef);
+
+             if (userDoc.exists) {
+               setUserData(userDoc.data());
+             }
+           }
+          } catch (error) {
+            console.error("Error fetching user data:", error);
+          } finally {
+            setLoading(false);
           }
-        });
-    
-        return () => unsubscribe();
-      } catch (error) {
-        console.error('Error fetching profile data:', error.message);
-      }
-    };
-    
-    fetchProfileData();
-  }, [userId]);
+        };
 
-  const handleAddSkill = async () => {
-    if (newSkill.trim()) {
-      const updatedSkills = [...userData.skills, newSkill.trim()];
-      try {
-        const profileDocRef = doc(db, 'profile', userId);
-        await updateDoc(profileDocRef, { skills: updatedSkills });
-        setUserData((prev) => ({
-          ...prev,
-          skills: updatedSkills,
-        }));
-        setNewSkill('');
-      } catch (error) {
-        console.error('Error adding skill:', error.message);
-        Alert.alert('Error', 'Failed to add skill.');
-      }
-    }
-  };
+        fetchUserData();
+      }, []);
 
-  const handleDeleteSkill = async (skillToDelete) => {
-    const updatedSkills = userData.skills.filter((skill) => skill !== skillToDelete);
-    try {
-      const profileDocRef = doc(db, 'profile', userId);
-      await updateDoc(profileDocRef, { skills: updatedSkills });
-      setUserData((prev) => ({
-        ...prev,
-        skills: updatedSkills,
-      }));
-    } catch (error) {
-      console.error('Error deleting skill:', error.message);
-      Alert.alert('Error', 'Failed to delete skill.');
-    }
-  };
 
-  const handleSaveAbout = async () => {
-    try {
-      const profileDocRef = doc(db, 'profile', userId);
-      await updateDoc(profileDocRef, { about: userData.about });
-      setIsEditingAbout(false);
-    } catch (error) {
-      console.error('Error saving about section:', error.message);
-      Alert.alert('Error', 'Failed to save about section.');
-    }
-  };
-
-  const pickImage = async () => {
-    let result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 1,
-    });
-
-    if (!result.canceled) {
-      try {
-        const profileDocRef = doc(db, 'profile', userId);
-        await updateDoc(profileDocRef, { imageUrl: result.assets[0].uri });
-        setUserData((prev) => ({
-          ...prev,
-          imageUrl: result.assets[0].uri,
-        }));
-      } catch (error) {
-        console.error('Error updating profile image:', error.message);
-      }
-    }
-  };
-
-  return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity style={styles.avatarContainer} onPress={pickImage}>
-          {userData.imageUrl ? (
-            <Image source={{ uri: userData.imageUrl }} style={styles.avatar} />
-          ) : (
-            <View style={styles.avatarPlaceholder}>
-              <Text style={styles.avatarText}>
-                {userData.username.charAt(0).toUpperCase()}
-              </Text>
-            </View>
-          )}
-          <View style={styles.cameraIconContainer}>
-            <Ionicons name="camera" size={20} color="#fff" />
-          </View>
-        </TouchableOpacity>
-        <Text style={styles.username}>{userData.username}</Text>
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#6B4EFF" />
       </View>
+    );
+  }
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>About</Text>
-        {isEditingAbout ? (
-          <TextInput
-            style={styles.input}
-            multiline
-            value={userData.about}
-            onChangeText={(text) => setUserData((prev) => ({ ...prev, about: text }))}
-            onBlur={handleSaveAbout}
-          />
-        ) : (
-          <TouchableOpacity onPress={() => setIsEditingAbout(true)}>
-            <Text style={styles.sectionContent}>{userData.about || 'Add a short bio'}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Skills</Text>
-        <View style={styles.skillsContainer}>
-          {userData.skills.map((skill, index) => (
-            <View key={index} style={styles.skillItem}>
-              <Text style={styles.skillText}>{skill}</Text>
-              <TouchableOpacity onPress={() => handleDeleteSkill(skill)}>
-                <Ionicons name="close-circle" size={20} color="#6a11cb" />
-              </TouchableOpacity>
-            </View>
-          ))}
+    if (!userData) {
+      return (
+        <View style={styles.container}>
+          <Text>No user data available</Text>
         </View>
-        {isEditingSkills ? (
-          <View style={styles.addSkillContainer}>
-            <TextInput
-              style={styles.skillInput}
-              value={newSkill}
-              onChangeText={setNewSkill}
-              placeholder="Add a skill"
-              placeholderTextColor="#999"
-            />
-            <TouchableOpacity style={styles.addButton} onPress={handleAddSkill}>
-              <Text style={styles.addButtonText}>Add</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <TouchableOpacity
-            style={styles.addSkillButton}
-            onPress={() => setIsEditingSkills(true)}
-          >
-            <Ionicons name="add-circle" size={24} color="#6a11cb" />
-            <Text style={styles.addSkillButtonText}>Add Skill</Text>
-          </TouchableOpacity>
-        )}
+      );
+    }
+    
+  return (
+    <View style={styles.container}>
+      <View style={styles.profileSection}>
+        <Image
+          source={{
+            uri: "https://go-talent.co.uk/sites/default/files/shutterstock_159456308_0.jpg",
+          }}
+          style={styles.profileImage}
+        />
+        <Text style={styles.name}>{userData.username}</Text>
+        <Text style={styles.email}>{userData.email}</Text>
       </View>
-    </ScrollView>
+
+      <View style={styles.statsContainer}>
+        <View style={[styles.statBox, { backgroundColor: "#E8E3FF" }]}>
+          <Text style={[styles.statNumber, { color: "#6B4EFF" }]}>14</Text>
+          <Text style={[styles.statLabel, { color: "#6B4EFF" }]}>Active</Text>
+        </View>
+        <View style={[styles.statBox, { backgroundColor: "#F8F8F8" }]}>
+          <Text style={styles.statNumber}>06</Text>
+          <Text style={styles.statLabel}>Pending</Text>
+        </View>
+        <View style={[styles.statBox, { backgroundColor: "#F8F8F8" }]}>
+          <Text style={styles.statNumber}>25</Text>
+          <Text style={styles.statLabel}>Complete</Text>
+        </View>
+      </View>
+
+      <View style={styles.menuSection}>
+        <TouchableOpacity style={styles.menuItem}>
+          <View style={styles.menuLeft}>
+            <View style={[styles.menuIcon, { backgroundColor: "#E8E3FF" }]}>
+              <Ionicons name="person-outline" size={20} color="#6B4EFF" />
+            </View>
+            <View>
+              <Text style={styles.menuTitle}>Username</Text>
+              <Text style={styles.menuSubtitle}>@cooper_bessie</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="#000" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <View style={styles.menuLeft}>
+            <View style={[styles.menuIcon, { backgroundColor: "#FFE8E8" }]}>
+              <Ionicons
+                name="notifications-outline"
+                size={20}
+                color="#FF4E4E"
+              />
+            </View>
+            <View>
+              <Text style={styles.menuTitle}>Notifications</Text>
+              <Text style={styles.menuSubtitle}>Mute Push, Email</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="#000" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.menuItem}>
+          <View style={styles.menuLeft}>
+            <View style={[styles.menuIcon, { backgroundColor: "#E8FFF7" }]}>
+              <Ionicons name="settings-outline" size={20} color="#4EFF91" />
+            </View>
+            <View>
+              <Text style={styles.menuTitle}>Settings</Text>
+              <Text style={styles.menuSubtitle}>Security, Privacy</Text>
+            </View>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="#000" />
+        </TouchableOpacity>
+      </View>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
-  },
-  header: {
-    alignItems: 'center',
+    backgroundColor: "#fff",
     padding: 20,
-    backgroundColor: '#fff',
   },
-  avatarContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    marginBottom: 10,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#e1e1e1',
+  profileSection: {
+    alignItems: "center",
   },
-  avatar: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+  profileImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    marginBottom: 15,
   },
-  avatarPlaceholder: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#6a11cb',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  avatarText: {
-    fontSize: 48,
-    color: '#fff',
-  },
-  cameraIconContainer: {
-    position: 'absolute',
-    right: 0,
-    bottom: 0,
-    backgroundColor: '#6a11cb',
-    borderRadius: 15,
-    padding: 5,
-  },
-  username: {
+  name: {
     fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  usernameInput: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: '#333',
-    borderBottomWidth: 1,
-    borderBottomColor: '#6a11cb',
+    fontWeight: "bold",
+    marginBottom: 5,
   },
   email: {
     fontSize: 16,
-    color: '#666',
-    marginBottom: 10,
+    color: "#666",
   },
-  editButton: {
-    backgroundColor: '#6a11cb',
-    paddingHorizontal: 20,
-    paddingVertical: 10,
-    borderRadius: 20,
+  statsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    marginTop: 30,
+    marginBottom: 30,
   },
-  editButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-  },
-  section: {
-    backgroundColor: '#fff',
-    marginTop: 20,
-    padding: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#6a11cb',
-    marginBottom: 10,
-  },
-  sectionContent: {
-    fontSize: 16,
-    color: '#333',
-  },
-  input: {
-    fontSize: 16,
-    color: '#333',
-    borderBottomWidth: 1,
-    borderBottomColor: '#6a11cb',
-  },
-  skillsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-  },
-  skillItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#e0e0e0',
+  statBox: {
+    width: "30%",
+    padding: 15,
     borderRadius: 15,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    marginRight: 10,
-    marginBottom: 10,
+    alignItems: "center",
   },
-  skillText: {
-    color: '#333',
-    marginRight: 5,
+  statNumber: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#666",
   },
-  addSkillContainer: {
-    flexDirection: 'row',
-    marginTop: 10,
+  statLabel: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 5,
   },
-  skillInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: '#6a11cb',
-    borderRadius: 5,
-    paddingHorizontal: 10,
-    marginRight: 10,
+  menuSection: {
+    marginTop: 20,
   },
-  addButton: {
-    backgroundColor: '#6a11cb',
-    paddingHorizontal: 15,
-    paddingVertical: 10,
-    borderRadius: 5,
-    justifyContent: 'center',
+  menuItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 20,
   },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
+  menuLeft: {
+    flexDirection: "row",
+    alignItems: "center",
   },
-  addSkillButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 10,
+  menuIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
+    marginRight: 15,
   },
-  addSkillButtonText: {
-    color: '#6a11cb',
-    marginLeft: 5,
-    fontWeight: 'bold',
+  menuTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  menuSubtitle: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 2,
   },
 });
 
-export default ProfileScreen;
+export default Profile;

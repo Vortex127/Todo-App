@@ -1,118 +1,135 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useEffect, useState } from "react";
 import {
   View,
   Text,
-  TouchableOpacity,
   StyleSheet,
-  Animated,
-  Easing,
-} from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { MaterialIcons, FontAwesome5 } from '@expo/vector-icons'; // Icon library
-import { doc, getDoc } from "firebase/firestore"; // Firestore methods
-import { useRoute } from '@react-navigation/native'; // For accessing route parameters
-import { db } from "../firebase"; // Your Firebase config
+  ActivityIndicator,
+  Image,
+  TextInput,
+  TouchableOpacity,
+  ScrollView
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { getAuth } from "firebase/auth";
+import {
+  getFirestore,
+  doc,
+  getDoc,
+  updateDoc,
+  Timestamp,
+} from "firebase/firestore";
 
-export default function WelcomeScreen({ navigation }) {
-  const route = useRoute();
-  const { uid } = route.params || {}; // Retrieve UID passed from the previous screen
-  const [username, setUsername] = useState(''); // State to hold the username
-  const animatedValue = useRef(new Animated.Value(0)).current;
+const Welcome = ({ navigation }) => {
+  const [userData, setUserData] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Fetch username from Firestore
   useEffect(() => {
-    const fetchUsername = async () => {
-      if (!uid) {
-        console.error('User ID not provided!');
-        return;
-      }
-
+    const fetchUserData = async () => {
       try {
-        const userDoc = doc(db, "users", uid); // Use uid from params
-        const userSnapshot = await getDoc(userDoc);
+        const auth = getAuth();
+        const user = auth.currentUser;
 
-        if (userSnapshot.exists()) {
-          setUsername(userSnapshot.data().username); // Assuming "username" is stored in Firestore
-        } else {
-          console.error('No user found!');
+        if (user) {
+          const db = getFirestore();
+          const userDocRef = doc(db, "users", user.uid);
+          const userDoc = await getDoc(userDocRef);
+
+          if (userDoc.exists) {
+            setUserData(userDoc.data());
+          }
         }
       } catch (error) {
-        console.error('Error fetching username:', error);
+        console.error("Error fetching user data:", error);
+      } finally {
+        setLoading(false);
       }
     };
 
-    fetchUsername();
-  }, [uid]); // Fetch data whenever uid changes
-
-  useEffect(() => {
-    Animated.loop(
-      Animated.timing(animatedValue, {
-        toValue: 1,
-        duration: 6000,
-        easing: Easing.linear,
-        useNativeDriver: false,
-      })
-    ).start();
+    fetchUserData();
   }, []);
 
-  const gradientColors = animatedValue.interpolate({
-    inputRange: [0, 1],
-    outputRange: [
-      'rgba(232, 72, 229, 1)', // Start Color
-      'rgba(82, 24, 250, 1)',  // End Color
-    ],
-  });
+  if (loading) {
+    return (
+      <View style={styles.container}>
+        <ActivityIndicator size="large" color="#6B4EFF" />
+      </View>
+    );
+  }
 
+  if (!userData) {
+    return (
+      <View style={styles.container}>
+        <Text>No user data available</Text>
+      </View>
+    );
+  }
   return (
-    <Animated.View style={[styles.container, { backgroundColor: gradientColors }]}>
-      <LinearGradient
-        colors={['#e848e5', '#5218fa']}
-        start={{ x: 0, y: 0 }}
-        end={{ x: 1, y: 1 }}
-        style={StyleSheet.absoluteFill}
-      />
+    <View style={styles.container}>
+      <Text style={styles.welcomeText}>Welcome</Text>
+      <Text style={styles.userName}>{userData.username}</Text>
 
-      <Text style={styles.welcomeText}>
-        Welcome, {username || 'Guest'}!
-      </Text>
-      <Text style={styles.subText}>
-        Discover amazing features and enhance your experience.
-      </Text>
-
-      {/* <TouchableOpacity
-        onPress={() => navigation.navigate('Profile')}
-        style={styles.primaryButton}
-      >
-        <LinearGradient
-          colors={['#f7b733', '#fc4a1a']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.gradientButton}
-        >
-          <Text style={styles.buttonText}>Go to Profile</Text>
-        </LinearGradient>
-      </TouchableOpacity> */}
-
-      <MagicNavbar navigation={navigation} />
-    </Animated.View>
-  );
-}
-
-const MagicNavbar = ({ navigation }) => {
-  return (
-    <View style={styles.navbar}>
-      <TouchableOpacity onPress={() => navigation.navigate('Welcome')} style={styles.navButton}>
-        <FontAwesome5 name="home" size={24} color="#6a11cb" />
-        <Text style={styles.navText}>Home</Text>
+      <TouchableOpacity style={styles.discoverCard}>
+        <View>
+          <Text style={styles.discoverText}>Discover</Text>
+          <Text style={styles.recipeText}>Today's top scored recipe!</Text>
+        </View>
+        <Image
+          source={{
+            uri: "https://go-talent.co.uk/sites/default/files/shutterstock_159456308_0.jpg",
+          }}
+          style={styles.sushiImage}
+        />
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('Notes')} style={styles.navButton}>
-        <MaterialIcons name="edit-note" size={24} color="#6a11cb" />
-        <Text style={styles.navText}>Notes</Text>
-      </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate('API')} style={styles.navButton}>
-        <MaterialIcons name="person" size={24} color="#6a11cb" />
-        <Text style={styles.navText}>Profile</Text>
-      </TouchableOpacity>
+
+      <ScrollView style={styles.recipeList}>
+        <TouchableOpacity style={styles.recipeItem}>
+          <View style={[styles.iconContainer, { backgroundColor: "#FFE8F7" }]}>
+            <Image
+              source={{
+                uri: "https://go-talent.co.uk/sites/default/files/shutterstock_159456308_0.jpg",
+              }}
+              style={styles.recipeIcon}
+            />
+          </View>
+          <View style={styles.recipeInfo}>
+            <Text style={styles.recipeTitle}>Pink Castle Cake</Text>
+            <Text style={styles.recipeCount}>24 recipes</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="#000" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.recipeItem}>
+          <View style={[styles.iconContainer, { backgroundColor: "#FFF5E8" }]}>
+            <Image
+              source={{
+                uri: "https://go-talent.co.uk/sites/default/files/shutterstock_159456308_0.jpg",
+              }}
+              style={styles.recipeIcon}
+            />
+          </View>
+          <View style={styles.recipeInfo}>
+            <Text style={styles.recipeTitle}>Cheese Pizza</Text>
+            <Text style={styles.recipeCount}>17 recipes</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="#000" />
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.recipeItem}>
+          <View style={[styles.iconContainer, { backgroundColor: "#F3E8FF" }]}>
+            <Image
+              source={{
+                uri: "https://go-talent.co.uk/sites/default/files/shutterstock_159456308_0.jpg",
+              }}
+              style={styles.recipeIcon}
+            />
+          </View>
+          <View style={styles.recipeInfo}>
+            <Text style={styles.recipeTitle}>Donut Cookies</Text>
+            <Text style={styles.recipeCount}>24 recipes</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={24} color="#000" />
+        </TouchableOpacity>
+      </ScrollView>
     </View>
   );
 };
@@ -120,64 +137,88 @@ const MagicNavbar = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#fff",
+    padding: 20,
+  },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 40,
+  },
+  profileImage: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   welcomeText: {
-    fontSize: 30,
-    fontWeight: 'bold',
-    color: '#fff',
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  subText: {
     fontSize: 16,
-    color: '#eee',
-    textAlign: 'center',
-    marginBottom: 40,
+    color: "#666",
   },
-  primaryButton: {
-    width: '80%',
-    height: 60,
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  gradientButton: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: 8,
-    width: '100%',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  navbar: {
-    position: 'absolute',
-    bottom: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    width: '100%',
-    height: 70,
-    elevation: 10,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-  },
-  navButton: {
-    alignItems: 'center',
-  },
-  navText: {
-    fontSize: 12,
-    color: '#6a11cb',
+  userName: {
+    fontSize: 24,
+    fontWeight: "bold",
     marginTop: 5,
   },
+  discoverCard: {
+    backgroundColor: "#E8E3FF",
+    borderRadius: 20,
+    padding: 20,
+    marginTop: 20,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  discoverText: {
+    color: "#fff",
+    fontSize: 16,
+  },
+  recipeText: {
+    color: "#fff",
+    fontSize: 20,
+    fontWeight: "600",
+    marginTop: 5,
+    maxWidth: 200,
+  },
+  sushiImage: {
+    width: 80,
+    height: 80,
+  },
+  recipeList: {
+    marginTop: 20,
+  },
+  recipeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 15,
+    backgroundColor: "#fff",
+    borderRadius: 15,
+    padding: 10,
+  },
+  iconContainer: {
+    width: 60,
+    height: 60,
+    borderRadius: 30,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  recipeIcon: {
+    width: 40,
+    height: 40,
+  },
+  recipeInfo: {
+    flex: 1,
+    marginLeft: 15,
+  },
+  recipeTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  recipeCount: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 2,
+  },
 });
+
+export default Welcome;

@@ -52,12 +52,12 @@ export default function SignupScreen({ navigation }) {
   
       if (userCredential && userCredential.user) {
         const user = userCredential.user;
-  
-        console.table({user});
-  
+
+        console.table({ user });
+
         // Save username and email in Firestore
         try {
-          console.log('Saving user data to Firestore');
+          console.log("Saving user data to Firestore");
           await setDoc(doc(db, "users", user.uid), {
             username: username,
             email: email,
@@ -67,14 +67,17 @@ export default function SignupScreen({ navigation }) {
         } catch (error) {
           console.error("Error adding document: ", error);
         }
-  
-        Alert.alert('Success', `Welcome ${username}`);
-  
+
+        Alert.alert("Success", `Welcome ${username}`);
+
+        // Navigate to WelcomeScreen with uid and username
+        navigation.navigate("Login");
+
         // Clear form fields
-        setEmail('');
-        setPassword('');
-        setUserName('');
-        setPasswordCheck('');
+        setEmail("");
+        setPassword("");
+        setUserName("");
+        setPasswordCheck("");
       } else {
         console.error("Error creating user: userCredential is null");
       }
